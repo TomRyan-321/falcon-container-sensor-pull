@@ -1,8 +1,36 @@
 # falcon-container-sensor-pull
-Bash script to pull latest Falcon Container Sensor from the CrowdStrike Container Registry to your local docker images
+## Bash script to pull latest Falcon Container or Node Kernel Mode DaemonSet Sensor from the CrowdStrike Container Registry to your local docker images
 
-Prerequisite: `jq`, `docker`
+### Prerequisite: 
+Script requires the following packages to be available: `curl`, `jq`, `docker`
 
-Requires users to first set `CID`, `CS_CLIENT_ID`, & `CS_CLIENT_SECRET` environment variables. Additionally set the `CS_REGION` variable if the user is not on US-1 Falcon Cloud.
+CrowdStrike API Client created with `Falcon Images Download` scope assigned.
+### Usage:
+Make the script file executable `chmod +x ./falcon-container-sensor-pull.sh`
 
-You may also opt for N-1 or N-2 images by modifying the JQ query to `jq -r '.resources[1].name' | \` for N-1 and `jq -r '.resources[2].name' | \` for N-2 on line number #32.
+Ensure docker is running locally.
+
+Execute the script with the relevant input arguments
+
+### Example usage to download DaemonSet Sensor:
+```
+./falcon-container-sensor-pull.sh \
+--cid <ABCDEFGHIJKLMN> \
+--clientid <ABCDEFG123456> \
+--clientsecret <ABCDEFG123456> \
+--node
+```
+### Full list of variables available:
+Variables can be passed to the script either via Arguments or via EnvVars:
+
+| Short Form         | Long Form                      | EnvVar             | Default           |Description                                                                             | 
+|:-------------------|--------------------------------|--------------------|-------------------|----------------------------------------------------------------------------------------|
+| `-f <CID>`         | `--cid <CID>`                  | `$CID`             | `None` (Required) |CrowdStrike Customer ID (CID)                                                           | 
+| `-u <CLIENT_ID>`   | `--clientid <CLIENT_ID>`       | `$CS_CLIENT_ID`    | `None` (Required) |CrowdStrike API Client ID                                                               | 
+| `-s <CLIENTSECRET>`| `--clientsecret <CLIENTSECRET>`| `$CS_CLIENT_SECRET`| `None` (Required) |CrowdStrike API Client Secret                                                           | 
+| `-r <REGION>`      | `--region <REGION>`            | `$REGION`          | `US-1` (Optional) |CrowdStrike Region                                                                      | 
+| `-n`               | `--node`                       | `$NODE`            | `false` (Optional)|Flag to download Node Sensor, if not set script defaults to downloading container sensor| 
+| `-h`               | `--help`                       | N/A                | `None`            |Display help message                                                                    | 
+
+
+

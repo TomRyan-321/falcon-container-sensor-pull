@@ -1,24 +1,94 @@
 #!/bin/bash
 : <<'#DESCRIPTION#'
 File: falcon-container-sensor-pull.sh
-Description: Bash script to pull Falcon Container Sensor image from CrowdStrike Container Registry, users must first set their CS_CLIENT_ID, CS_CLIENT_SECRET & CID variables before use and set region using CS_REGION if not using US-1.
+Description: Bash script to pull Falcon DaemonSet & Container Sensor images from CrowdStrike Container Registry.
 #DESCRIPTION#
 
-#Check if CS_REGION variable set, if not use US-1
+usage() 
+{
+    echo "usage: 
+$0 \\
+    -f | --cid <FALCONCID> \\
+    -u | --clientid <FALCONCLIENTID> \\
+    -s | --clientsecret <FALCONCLIENTSECRET> \\
+    -r | --region <FALCONREGION> \\
+    -n | --node (OPTIONAL FLAG) tells script to download node sensor instead of container sensor \\
+    -h | --help display this help message"
+    exit 2
+}
+
+while (( "$#" )); do
+case "$1" in
+    -u|--clientid)
+    if [[ -n ${2:-} ]] ; then
+        CS_CLIENT_ID="$2"
+        shift
+    fi
+    ;;
+    -s|--clientsecret)
+    if [[ -n ${2:-} ]]; then
+        CS_CLIENT_SECRET="$2"
+        shift
+    fi
+    ;;
+    -r|--region)
+    if [[ -n ${2:-} ]]; then
+        CS_REGION="$2"
+        shift
+    fi
+    ;;
+    -f|--cid)
+    if [[ -n ${2:-} ]]; then
+        CID="$2"
+        shift
+    fi
+    ;;
+    -n|--node)
+    if [[ -n ${1} ]]; then
+        NODE=true
+    fi
+    ;;
+    -h|--help)
+    if [[ -n ${1} ]]; then
+        usage
+    fi
+    ;;
+    --) # end argument parsing
+    shift
+    break
+    ;;
+    -*) # unsupported flags
+    >&2 echo "ERROR: Unsupported flag: '$1'"
+    usage
+    exit 1
+    ;;
+esac
+shift
+done
+
+#Check all mandatory variables set
+VARIABLES=(CID CS_CLIENT_ID CS_CLIENT_SECRET)
+{
+    for VAR_NAME in "${VARIABLES[@]}"; do
+        [ -z "${!VAR_NAME}" ] && echo "$VAR_NAME is unset refer to help to set" && VAR_UNSET=true
+    done
+        [ -n "$VAR_UNSET" ] && usage
+}
+
+#Check if CS_REGION and set API endpoint and convert to lower
 if [[ -z "${CS_REGION}" ]]; then
     echo "\$CS_REGION variable not set, assuming US-1"
-    REGION="US-1"
+    REGION="us-1"
     API="api"
 else
-    REGION=$(echo "${CS_REGION}" | tr '[:lower:]' '[:upper:]') #Convert to UPPERCASE if user entered as lower case
-    API="api.${CS_REGION}"
+    REGION=$(echo "${CS_REGION}" | tr '[:upper:]' '[:lower:]') #Convert to lowercase if user entered as UPPERCASE
+    API="api.${REGION}"
 fi
 
-#Convert region to lowercase
-REGIONLOWER=$(echo "${REGION}" | tr '[:upper:]' '[:lower:]')
-#Convert CID to lowercase
+#Convert CID to lowercase and remove checksum if present
 CIDLOWER=$(echo "${CID}" | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
-#Checkout a bearer using the client id+secret
+
+#Get Bearer token to use with registry credentials api endpoint
 BEARER=$(curl \
 --data "client_id=${CS_CLIENT_ID}&client_secret=${CS_CLIENT_SECRET}" \
 --request POST \
@@ -26,18 +96,25 @@ BEARER=$(curl \
 https://"${API}".crowdstrike.com/oauth2/token | jq -r '.access_token')
 
 #Set Docker token using the BEARER token captured earlier
-ART_PASSWORD=$(curl -X GET -H "authorization: Bearer ${BEARER}" \
+ART_PASSWORD=$(curl -s -X GET -H "authorization: Bearer ${BEARER}" \
 https://"${API}".crowdstrike.com/container-security/entities/image-registry-credentials/v1 | \
 jq -r '.resources[].token')
 
-#Gets name of latest sensor, to pull N-1 or N-2 change the value in the JQ statement from resources[0] LATEST to [1] for N-1 or [2] for N-2
-LATESTSENSOR=$(curl -X GET "https://${API}.crowdstrike.com/sensors/combined/installers/v1?limit=3&sort=version%7Cdesc&filter=os%3A%22Container%22" \
--H  "accept: application/json" -H  "authorization: Bearer ${BEARER}" | \
-jq -r '.resources[0].name' | \
-awk 'sub(/.*falcon-sensor-*/,""){f=1} f{if ( sub(/ *.container.*/,"") ) f=0; print}') 
-#Set latest image in same format the CS registry uses (slightly different to sensor downloads name)
-LATESTIMAGE="registry.crowdstrike.com/falcon-container/${REGIONLOWER}/release/falcon-sensor:${LATESTSENSOR}.container.x86_64.Release.${REGION}"
 #Set docker login
 docker login --username  "fc-${CIDLOWER}" --password "${ART_PASSWORD}" registry.crowdstrike.com
+
+#Check if user wants to download DaemonSet Node Sensor
+if [[ $NODE = true ]]; then
+    SENSORTYPE="falcon-sensor"
+else
+    SENSORTYPE="falcon-container"
+fi
+
+#Get BEARER token for Registry
+REGISTRYBEARER=$(curl -X GET -s -u "fc-${CIDLOWER}:${ART_PASSWORD}" "https://registry.crowdstrike.com/v2/token?=fc-${CIDLOWER}&scope=repository:$SENSORTYPE/$REGION/release/falcon-sensor:pull&service=registry.crowdstrike.com" | jq -r '.token')
+#Get latest sensor version
+LATESTSENSOR=$(curl -X GET -s -H "authorization: Bearer ${REGISTRYBEARER}" "https://registry.crowdstrike.com/v2/$SENSORTYPE/$REGION/release/falcon-sensor/tags/list" | jq -r '.tags[-1]') 
+#Construct full image path
+FULLIMAGEPATH="registry.crowdstrike.com/$SENSORTYPE/${REGION}/release/falcon-sensor:${LATESTSENSOR}"
 #Pull the container image locally
-docker pull "${LATESTIMAGE}"
+docker pull "${FULLIMAGEPATH}"
