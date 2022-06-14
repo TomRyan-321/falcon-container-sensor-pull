@@ -13,6 +13,7 @@ $0 \\
     -s | --clientsecret <FALCONCLIENTSECRET> \\
     -r | --region <FALCONREGION> \\
     -n | --node (OPTIONAL FLAG) tells script to download node sensor instead of container sensor \\
+    -g | --gov (OPTIONAL FLAG) tells the script to use Gov Cloud endpoints
     -h | --help display this help message"
     exit 2
 }
@@ -48,6 +49,11 @@ case "$1" in
         NODE=true
     fi
     ;;
+    -g|--gov)
+    if [[ -n ${1} ]]; then
+        GOV=true
+    fi
+    ;;
     -h|--help)
     if [[ -n ${1} ]]; then
         usage
@@ -75,14 +81,21 @@ VARIABLES=(CID CS_CLIENT_ID CS_CLIENT_SECRET)
         [ -n "$VAR_UNSET" ] && usage
 }
 
-#Check if CS_REGION and set API endpoint and convert to lower
-if [[ -z "${CS_REGION}" ]]; then
+#Check if GOVCLOUD flag setup regions
+if [[ $GOV = true ]]; then
+    echo "GovCloud flag set, using govcloud endpoints"
+    REGION="govcloud"
+    API="api.laggar.gcw"
+    REGISTRY="registry.laggar.gcw"
+elif [[ -z "${CS_REGION}" ]]; then
     echo "\$CS_REGION variable not set, assuming US-1"
     REGION="us-1"
     API="api"
+    REGISTRY="registry"
 else
     REGION=$(echo "${CS_REGION}" | tr '[:upper:]' '[:lower:]') #Convert to lowercase if user entered as UPPERCASE
     API="api.${REGION}"
+    REGISTRY="registry"
 fi
 
 #Convert CID to lowercase and remove checksum if present
@@ -101,7 +114,7 @@ https://"${API}".crowdstrike.com/container-security/entities/image-registry-cred
 jq -r '.resources[].token')
 
 #Set docker login
-docker login --username  "fc-${CIDLOWER}" --password "${ART_PASSWORD}" registry.crowdstrike.com
+docker login --username  "fc-${CIDLOWER}" --password "${ART_PASSWORD}" $REGISTRY.crowdstrike.com
 
 #Check if user wants to download DaemonSet Node Sensor
 if [[ $NODE = true ]]; then
@@ -111,10 +124,10 @@ else
 fi
 
 #Get BEARER token for Registry
-REGISTRYBEARER=$(curl -X GET -s -u "fc-${CIDLOWER}:${ART_PASSWORD}" "https://registry.crowdstrike.com/v2/token?=fc-${CIDLOWER}&scope=repository:$SENSORTYPE/$REGION/release/falcon-sensor:pull&service=registry.crowdstrike.com" | jq -r '.token')
+REGISTRYBEARER=$(curl -X GET -s -u "fc-${CIDLOWER}:${ART_PASSWORD}" "https://$REGISTRY.crowdstrike.com/v2/token?=fc-${CIDLOWER}&scope=repository:$SENSORTYPE/$REGION/release/falcon-sensor:pull&service=registry.crowdstrike.com" | jq -r '.token')
 #Get latest sensor version
-LATESTSENSOR=$(curl -X GET -s -H "authorization: Bearer ${REGISTRYBEARER}" "https://registry.crowdstrike.com/v2/$SENSORTYPE/$REGION/release/falcon-sensor/tags/list" | jq -r '.tags[-1]') 
+LATESTSENSOR=$(curl -X GET -s -H "authorization: Bearer ${REGISTRYBEARER}" "https://$REGISTRY.crowdstrike.com/v2/$SENSORTYPE/$REGION/release/falcon-sensor/tags/list" | jq -r '.tags[-1]') 
 #Construct full image path
-FULLIMAGEPATH="registry.crowdstrike.com/$SENSORTYPE/${REGION}/release/falcon-sensor:${LATESTSENSOR}"
+FULLIMAGEPATH="$REGISTRY.crowdstrike.com/$SENSORTYPE/${REGION}/release/falcon-sensor:${LATESTSENSOR}"
 #Pull the container image locally
 docker pull "${FULLIMAGEPATH}"
