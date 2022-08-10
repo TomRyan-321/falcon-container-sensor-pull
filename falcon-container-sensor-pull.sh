@@ -4,9 +4,9 @@ File: falcon-container-sensor-pull.sh
 Description: Bash script to pull Falcon DaemonSet & Container Sensor images from CrowdStrike Container Registry.
 #DESCRIPTION#
 
-usage() 
+usage()
 {
-    echo "usage: 
+    echo "usage:
 $0 \\
     -f | --cid <FALCONCID> \\
     -u | --clientid <FALCONCLIENTID> \\
@@ -89,7 +89,7 @@ if [[ $GOV = true ]]; then
     REGISTRY="registry.laggar.gcw"
 elif [[ -z "${CS_REGION}" ]]; then
     echo "\$CS_REGION variable not set, assuming US-1"
-    REGION="us-1"
+    REGION="us-2"
     API="api"
     REGISTRY="registry"
 else
@@ -126,7 +126,7 @@ fi
 #Get BEARER token for Registry
 REGISTRYBEARER=$(curl -X GET -s -u "fc-${CIDLOWER}:${ART_PASSWORD}" "https://$REGISTRY.crowdstrike.com/v2/token?=fc-${CIDLOWER}&scope=repository:$SENSORTYPE/$REGION/release/falcon-sensor:pull&service=registry.crowdstrike.com" | jq -r '.token')
 #Get latest sensor version
-LATESTSENSOR=$(curl -X GET -s -H "authorization: Bearer ${REGISTRYBEARER}" "https://$REGISTRY.crowdstrike.com/v2/$SENSORTYPE/$REGION/release/falcon-sensor/tags/list" | jq -r '.tags[-1]') 
+LATESTSENSOR=$(curl -X GET -s -H "authorization: Bearer ${REGISTRYBEARER}" "https://$REGISTRY.crowdstrike.com/v2/$SENSORTYPE/$REGION/release/falcon-sensor/tags/list" | jq -r '.tags[-1]')
 #Construct full image path
 FULLIMAGEPATH="$REGISTRY.crowdstrike.com/$SENSORTYPE/${REGION}/release/falcon-sensor:${LATESTSENSOR}"
 #Pull the container image locally
