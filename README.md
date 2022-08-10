@@ -10,14 +10,15 @@ Make the script file executable `chmod +x ./falcon-container-sensor-pull.sh`
 
 Ensure docker is running locally.
 
-Execute the script with the relevant input arguments
+Execute the script with the relevant input arguments, GovCloud customers can omit the region flag and simply use the `--gov` flag to correctly set the endpoint.
 
-### Example usage to download DaemonSet Sensor:
+### Example usage to download DaemonSet Sensor from Falcon US-2:
 ```
 ./falcon-container-sensor-pull.sh \
 --cid <ABCDEFGHIJKLMN> \
 --clientid <ABCDEFG123456> \
 --clientsecret <ABCDEFG123456> \
+--region US-2 \
 --node
 ```
 ### Full list of variables available:
