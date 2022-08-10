@@ -87,15 +87,17 @@ if [[ $GOV = true ]]; then
     REGION="govcloud"
     API="api.laggar.gcw"
     REGISTRY="registry.laggar.gcw"
-elif [[ -z "${CS_REGION}" ]]; then
-    echo "\$CS_REGION variable not set, assuming US-1"
+    echo "Using Falcon API endpoint of ${API}.crowdstrike.com and Registry endpoint of ${REGISTRY}.crowdstrike.com"
+elif [[ -z "${CS_REGION}" ]] || [[ "${CS_REGION}" = "US-1" ]] || [[ "${CS_REGION}" = "us-1" ]]; then
     REGION="us-1"
     API="api"
     REGISTRY="registry"
+    echo "Using Falcon API endpoint of ${API}.crowdstrike.com and Registry endpoint of ${REGISTRY}.crowdstrike.com"
 else
     REGION=$(echo "${CS_REGION}" | tr '[:upper:]' '[:lower:]') #Convert to lowercase if user entered as UPPERCASE
     API="api.${REGION}"
     REGISTRY="registry"
+    echo "Using Falcon API endpoint of ${API}.crowdstrike.com and Registry endpoint of ${REGISTRY}.crowdstrike.com"
 fi
 
 #Convert CID to lowercase and remove checksum if present
