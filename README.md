@@ -1,3 +1,6 @@
+## This repository has been archived, the code is now maintained under the official CrowdStrike Github Account here: https://github.com/CrowdStrike/falcon-scripts/tree/main/bash/containers/falcon-container-sensor-pull
+
+
 # falcon-container-sensor-pull
 ## Bash script to pull latest Falcon Container or Node Kernel Mode DaemonSet Sensor from the CrowdStrike Container Registry to your local docker images
 
